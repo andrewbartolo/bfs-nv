@@ -33,6 +33,8 @@ static msgType interrupts[N_WORKERS];
 static char brokerBuffer[MSG_BUF_LEN];
 static int bufferLen;
 
+// TODO send and recv should assume an asynchronous middle man (and not
+// do all the work themselves)
 
 void sendData(int destNodeIdx, char *workerBuffer, int _bufferLen) {
     /*
@@ -62,12 +64,13 @@ void sendShutdown(int destNodeIdx) {
 // received, and returns a void * to the buffer where the message is placed.
 //
 // currently spins, but we could also use a mutex
-void recv(int myNodeIdx, char *workerBuffer) {   // blocking recv
+void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen) {   // blocking recv
     interrupts[myNodeIdx] = RECVING;
 
     while (interrupts[myNodeIdx] != DATA_FOR_ME) { } // spin.
 
     memcpy(workerBuffer, brokerBuffer, bufferLen);
+    *_bufferLen = bufferLen;
 
     // clear the interrupts
     interrupts[myNodeIdx] = IDLE;
@@ -77,8 +80,11 @@ void recv(int myNodeIdx, char *workerBuffer) {   // blocking recv
 
 
 void broker_loop() {
+    printf("Beginning broker loop\n");
     while (true) {
-        printf("polling workers now\n");
+
+
+
         sleep(1);
     }
 }

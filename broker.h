@@ -16,7 +16,7 @@
 void sendData(int nodeIdx, char *workerBuffer, int _bufferLen);
 void sendWakeup(int nodeIdx);
 void sendShutdown(int nodeIdx);
-void recv(int myNodeIdx, char *workerBuffer);   // blocking recv
+void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen);   // blocking recv
 
 
 
