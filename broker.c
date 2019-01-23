@@ -40,10 +40,15 @@ void sendData(int destNodeIdx, char *workerBuffer, int _bufferLen) {
     /*
      * If the receiver isn't ready, the message will be missed (NOT buffered).
      */
-    assert(interrupts[destNodeIdx] == RECVING);
+    //assert(interrupts[destNodeIdx] == RECVING);
+    if (interrupts[destNodeIdx] != RECVING) {
+        printf("\033[0;33mWarning: intended receiver node wasn't ready yet.\033[0m\n");
+    }
+    // TODO if the receiver isn't ready, just block (spin)
+    while (interrupts[destNodeIdx] != RECVING) { }
 
     // perform the memcpy() into the FPGA buffer
-    memcpy(brokerBuffer, workerBuffer, bufferLen);
+    memcpy(brokerBuffer, workerBuffer, _bufferLen);
     bufferLen = _bufferLen;
 
     // set the interrupt so that the worker knows its data is ready to be
@@ -68,6 +73,7 @@ void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen) {   // blocking re
     interrupts[myNodeIdx] = RECVING;
 
     while (interrupts[myNodeIdx] != DATA_FOR_ME) { } // spin.
+
 
     memcpy(workerBuffer, brokerBuffer, bufferLen);
     *_bufferLen = bufferLen;

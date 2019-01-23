@@ -16,7 +16,7 @@
 void *worker(void *_wc) {
     workerCtrl *wc = (workerCtrl *)_wc;
     int myNodeIdx = wc->workerID;
-    printf("Hello from worker %d\n", myNodeIdx);
+    printf("Worker %d starting up.\n", myNodeIdx);
 
     // TODO move this to scratchpad region
     char workerBuffer[MSG_BUF_LEN];
@@ -25,9 +25,6 @@ void *worker(void *_wc) {
 
     // TESTING: start the chain reaction
     if (myNodeIdx == 0) {
-        // wait for dest node to receive
-        sleep(1);
-
         // fill the buffer...
         const char *str = "Hello.";
         strncpy(workerBuffer, str, MSG_BUF_LEN);
@@ -40,7 +37,11 @@ void *worker(void *_wc) {
 
     while (true) {
         recv(myNodeIdx, workerBuffer, &workerBufferLen);
-        printf("Received %d bytes.\n", workerBufferLen);
+        printf("Worker %d received %d bytes: %s\n", myNodeIdx, workerBufferLen,
+                workerBuffer);
+
+        // forward to the next worker.
+        sendData((myNodeIdx + 1) % N_WORKERS, workerBuffer, workerBufferLen);
     }
 
     return NULL;
