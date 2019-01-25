@@ -32,7 +32,8 @@ void *worker(void *_wc) {
         workerBuffer[workerBufferLen] = 0;  // null-terminate
 
         // ...and send the data.
-        sendData(1, workerBuffer, workerBufferLen);
+        sendData(0 /* Our ID, 0 */, 1 /* Next worker ID, 1 */, workerBuffer,
+                 workerBufferLen);
     }
 
     while (true) {
@@ -41,7 +42,7 @@ void *worker(void *_wc) {
                 workerBuffer);
 
         // forward to the next worker.
-        sendData((myNodeIdx + 1) % N_WORKERS, workerBuffer, workerBufferLen);
+        sendData(myNodeIdx, (myNodeIdx + 1) % N_WORKERS, workerBuffer, workerBufferLen);
     }
 
     return NULL;

@@ -13,9 +13,9 @@
  *
  * These functions will need to be adjusted to port over to the actual board.
  */
-void sendData(int nodeIdx, char *workerBuffer, int _bufferLen);
-void sendWakeup(int nodeIdx);
-void sendShutdown(int nodeIdx);
+void sendData(int myNodeIdx, int _destNodeIdx, char *workerBuffer, int _bufferLen);
+void sendWakeup(int _destNodeIdx);
+void sendShutdown(int _destNodeIdx);
 void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen);   // blocking recv
 
 

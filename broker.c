@@ -6,13 +6,9 @@
 #include <unistd.h>
 
 #include "broker.h"
+#include "util.h"
 
 
-/*
- * interrupts[i] indicates the operation being performed for *destination*
- * worker i, by some other source worker. (TODO: We don't need to keep track of
- * the source worker?)
- */
 typedef enum msgType {
     DATA_FOR_ME,
     WAKEUP_FOR_ME,
@@ -20,8 +16,16 @@ typedef enum msgType {
     RECVING,
     IDLE
 } msgType;
-static msgType interrupts[N_WORKERS];
 
+
+/*
+ * These represent the registers exported by the master FPGA.
+ * TODO make sure these are set and read atomically!!
+ */
+static bool RTS[N_WORKERS];    // Ready to Send
+static bool CTS[N_WORKERS];    // Clear to Send
+static bool RTR[N_WORKERS];    // Ready to Receive
+static bool CTR[N_WORKERS];    // Clear to Receive
 
 
 /*
@@ -32,54 +36,63 @@ static msgType interrupts[N_WORKERS];
  */
 static char brokerBuffer[MSG_BUF_LEN];
 static int bufferLen;
+static int destNodeIdx;
 
-// TODO send and recv should assume an asynchronous middle man (and not
-// do all the work themselves)
+/*
+ * Synchronous, blocking send.
+ */
+void sendData(int myNodeIdx, int _destNodeIdx, char *workerBuffer, int _bufferLen) {
+    assert(!RTS[myNodeIdx]);    // Flag should be false at the start
 
-void sendData(int destNodeIdx, char *workerBuffer, int _bufferLen) {
-    /*
-     * If the receiver isn't ready, the message will be missed (NOT buffered).
-     */
-    //assert(interrupts[destNodeIdx] == RECVING);
-    if (interrupts[destNodeIdx] != RECVING) {
-        printf("\033[0;33mWarning: intended receiver node wasn't ready yet.\033[0m\n");
-    }
-    // TODO if the receiver isn't ready, just block (spin)
-    while (interrupts[destNodeIdx] != RECVING) { }
+    // Set the flag TODO atomically, indicate to master we want to send
+    RTS[myNodeIdx] = true;
 
-    // perform the memcpy() into the FPGA buffer
+    // Synchronize on the FPGA's ACK (FPGA sets CTS)
+    spinWhile(!CTS[myNodeIdx]);
+
+    // Actually put data over the pins to the FPGA master
+    // TODO do this in hardware
     memcpy(brokerBuffer, workerBuffer, _bufferLen);
     bufferLen = _bufferLen;
+    destNodeIdx = _destNodeIdx;
 
-    // set the interrupt so that the worker knows its data is ready to be
-    // retrieved. TODO do this in hardware
+    // Worker unsets RTS[i] to indicate to FPGA that it's sent all data
+    RTS[myNodeIdx] = false;
 
-    interrupts[destNodeIdx] = DATA_FOR_ME;
+    // FPGA's ACK of receiver's receipt is clearing the sender's CTS flag
+    spinWhile(CTS[myNodeIdx]);
 }
 
 // TODO implement wakeup and shutdown later
-void sendWakeup(int destNodeIdx) {
+void sendWakeup(int _destNodeIdx) {
 
 }
-void sendShutdown(int destNodeIdx) {
+void sendShutdown(int _destNodeIdx) {
 
 }
 
-// polls the master FPGA continuously for any messages it might have
-// received, and returns a void * to the buffer where the message is placed.
-//
-// currently spins, but we could also use a mutex
-void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen) {   // blocking recv
-    interrupts[myNodeIdx] = RECVING;
+/*
+ * Synchronous, blocking receive.
+ */
+void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen) {
+    assert(!RTR[myNodeIdx]);    // Flag should be false at the start
 
-    while (interrupts[myNodeIdx] != DATA_FOR_ME) { } // spin.
+    // Set the flag TODO atomically, indicate to master we're ready to receive
+    RTR[myNodeIdx] = true;
 
+    // Synchronize on the FPGA's ACK (FPGA sets CTR)
+    spinWhile(!CTR[myNodeIdx]);
 
+    // Actually pull the data out of the FPGA master
+    // TODO do this in hardware
     memcpy(workerBuffer, brokerBuffer, bufferLen);
     *_bufferLen = bufferLen;
 
-    // clear the interrupts
-    interrupts[myNodeIdx] = IDLE;
+    // Tell the FPGA we're done DMAing data out
+    RTR[myNodeIdx] = false;
+
+    // Here, FPGA's ACK of receiver's receipt is receiver clearing its own CTR
+    spinWhile(CTR[myNodeIdx]);
 }
 
 
@@ -87,10 +100,27 @@ void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen) {   // blocking re
 
 void broker_loop() {
     printf("Beginning broker loop\n");
+
     while (true) {
+        // Walk the RTS bitvector, seeing if anyone wants to send
+        // TODO replace with e.g. hardware interrupts instead of polling
+        for (int senderNodeIdx = 0; senderNodeIdx < N_WORKERS; ++senderNodeIdx) {
+            if (RTS[senderNodeIdx]) {
+                assert(!CTS[senderNodeIdx]);    // shouldn't already be set
+                CTS[senderNodeIdx] = true;      // TODO make atomic
+                // At this step, worker DMAs into our buffer
+                spinWhile(RTS[senderNodeIdx]);
+                spinWhile(!RTR[destNodeIdx]);   // wait for receiver node ready
+                assert(!CTR[destNodeIdx]);      // should't already be set
+                CTR[destNodeIdx] = true;        // tell receiver to DMA from us now
+                spinWhile(RTR[destNodeIdx]);    // wait for receiver done w/DMA
+
+                CTS[senderNodeIdx] = false;     // release the sender
+                CTR[destNodeIdx] = false;       // release the receiver
+            }
+        }
 
 
 
-        sleep(1);
     }
 }

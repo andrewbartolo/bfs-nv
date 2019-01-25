@@ -18,7 +18,7 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 # TODO unify concept of below pattern rule and $(OBJFILES)
-# TODO do .h check too (this currently fails for main.cpp, since it has no .h)
+# TODO do .h check too (this currently fails for main.c, since it has no .h)
 $(BUILDDIR)/%.o: %.c
 	$(CC) $(CCFLAGS) -std=$(CSTD) -c -o $@ $<
 
