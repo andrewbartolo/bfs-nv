@@ -1,7 +1,5 @@
 #pragma once
 
-#include "worker.h"
-
 #define N_WORKERS 8
 #define MSG_BUF_LEN 256
 

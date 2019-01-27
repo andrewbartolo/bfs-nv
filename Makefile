@@ -5,7 +5,7 @@ SRCFILES=$(wildcard *.c)
 BUILDDIR=build
 # Every file in OBJFILES has the directory prepended to it
 OBJFILES=$(SRCFILES:%.cpp=$(BUILDDIR)/%.o)
-BINNAME=bfs
+BINNAME=run-unit-tests
 
 .PHONY: clean run
 
@@ -18,7 +18,7 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 # TODO unify concept of below pattern rule and $(OBJFILES)
-# TODO do .h check too (this currently fails for main.c, since it has no .h)
+# TODO do .h check too (this currently fails for modules which lack a separate .h)
 $(BUILDDIR)/%.o: %.c
 	$(CC) $(CCFLAGS) -std=$(CSTD) -c -o $@ $<
 
