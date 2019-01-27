@@ -42,7 +42,7 @@ static bool CTR[N_WORKERS];    // Clear to Receive
  * responsibility to mediate access to it correctly.
  */
 static char brokerBuffer[MSG_BUF_LEN];
-static int bufferLen;
+static int bufferLen;   // TODO rename; e.g. messageLen
 static int destNodeIdx;
 
 /*
@@ -92,6 +92,7 @@ void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen) {
 
     // Actually pull the data out of the FPGA master
     // TODO do this in hardware
+    memset(workerBuffer, 0, MSG_BUF_LEN);
     memcpy(workerBuffer, brokerBuffer, bufferLen);
     *_bufferLen = bufferLen;
 
@@ -122,7 +123,7 @@ bool anyWorkerNeedsMe() {
 
 
 void broker_loop() {
-    printf("Beginning broker loop\n");
+    //printf("Beginning broker loop\n");
 
     while (anyWorkerNeedsMe()) {
         // Walk the RTS bitvector, seeing if anyone wants to send

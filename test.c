@@ -15,11 +15,14 @@ typedef struct {
 
 
 
-// Main entry point for the pthreads for the worker.
+/*
+ * N_WORKERS pass messages around in a ring. After nRounds, they signal their
+ * exit to the master and then exit themselves.
+ */ 
 void *circularTest(void *_wc) {
     workerCtrl *wc = (workerCtrl *)_wc;
     int myNodeIdx = wc->workerID;
-    printf("Worker %d starting up.\n", myNodeIdx);
+    //printf("Worker %d starting up.\n", myNodeIdx);
 
     // TODO move this to scratchpad region
     char workerBuffer[MSG_BUF_LEN];
@@ -27,10 +30,10 @@ void *circularTest(void *_wc) {
 
 
     // Run for 100 rounds, say
-    int sendsRemaining = 1, recvsRemaining = 1;
+    int nRounds = 100;
+    int sendsRemaining = nRounds, recvsRemaining = nRounds;
     if (myNodeIdx == 0) --recvsRemaining; // Worker 0 doens't perform an initial recv
     if (myNodeIdx == N_WORKERS - 1) --sendsRemaining; // Last worker doesn't perform a final send
-
 
 
     // TESTING: start the chain reaction
@@ -53,8 +56,8 @@ void *circularTest(void *_wc) {
         recv(myNodeIdx, workerBuffer, &workerBufferLen);
         --recvsRemaining;
 
-        printf("Worker %d received %d bytes: %s\n", myNodeIdx, workerBufferLen,
-                workerBuffer);
+        //printf("Worker %d received %d bytes: %s\n", myNodeIdx, workerBufferLen,
+        //       workerBuffer);
 
         if (sendsRemaining == 0) break;
         sendData(myNodeIdx, (myNodeIdx + 1) % N_WORKERS, workerBuffer, workerBufferLen);
@@ -66,7 +69,6 @@ void *circularTest(void *_wc) {
 }
 
 
-
 /*
  * This function prints the name of the current test being performed,
  * kicks off the workers, kicks off the master message broker, and then
@@ -74,7 +76,8 @@ void *circularTest(void *_wc) {
  * passed or failed.
  */
 int assertPass(const char *testName, void *(*testImpl)(void *)) {
-    printf("Beginning %s...\n", testName);
+    printf("Running %s...", testName);
+    fflush(stdout);
 
     pthread_t handles[N_WORKERS];
     workerCtrl ctrls[N_WORKERS];
@@ -100,16 +103,26 @@ int assertPass(const char *testName, void *(*testImpl)(void *)) {
         }
     }
 
-    printf("%s:\t\t[\033[0;32mPASS\033[0;0m]\n", testName);
+    printf("\t\t[\033[0;32mPASS\033[0;0m]\n");
     return 0;
 }
 
+/*
+ * TODO run all of the test cases in a separate thread... and then fail it
+ * if it times out.
+ */
 int main(int argc, char *argv[]) {
     /*
      * The main testing loop. Runs a bunch of unit tests and asserts that
      * they all pass.
      */
-    int retVal = assertPass("circularTest", circularTest);
+    int retVal;
+    retVal  = assertPass("circularTest", circularTest);
+    // TODO
+    //retVal |= assertPass("pingPongTest", pingPongTest);
+    //retVal |= assertPass("loopbackTest", loopbackTest);
+    //retval |= assertPass("diffSizeTest", diffSizeTest);
+
 
 
     return retVal;
