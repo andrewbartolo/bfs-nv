@@ -26,8 +26,16 @@ void *circularTest(void *_wc) {
     int workerBufferLen;
 
 
+    // Run for 100 rounds, say
+    int sendsRemaining = 1, recvsRemaining = 1;
+    if (myNodeIdx == 0) --recvsRemaining; // Worker 0 doens't perform an initial recv
+    if (myNodeIdx == N_WORKERS - 1) --sendsRemaining; // Last worker doesn't perform a final send
+
+
+
     // TESTING: start the chain reaction
     if (myNodeIdx == 0) {
+
         // fill the buffer...
         const char *str = "Hello.";
         strncpy(workerBuffer, str, MSG_BUF_LEN);
@@ -37,17 +45,23 @@ void *circularTest(void *_wc) {
         // ...and send the data.
         sendData(0 /* Our ID, 0 */, 1 /* Next worker ID, 1 */, workerBuffer,
                  workerBufferLen);
+        --sendsRemaining;
     }
 
     while (true) {
+        if (recvsRemaining == 0) break;
         recv(myNodeIdx, workerBuffer, &workerBufferLen);
+        --recvsRemaining;
+
         printf("Worker %d received %d bytes: %s\n", myNodeIdx, workerBufferLen,
                 workerBuffer);
 
-        // forward to the next worker.
+        if (sendsRemaining == 0) break;
         sendData(myNodeIdx, (myNodeIdx + 1) % N_WORKERS, workerBuffer, workerBufferLen);
+        --sendsRemaining;
     }
 
+    setWorkerDone(myNodeIdx);
     return NULL;
 }
 
@@ -60,7 +74,7 @@ void *circularTest(void *_wc) {
  * passed or failed.
  */
 int assertPass(const char *testName, void *(*testImpl)(void *)) {
-    printf("Beginning %s...", testName);
+    printf("Beginning %s...\n", testName);
 
     pthread_t handles[N_WORKERS];
     workerCtrl ctrls[N_WORKERS];
@@ -86,7 +100,7 @@ int assertPass(const char *testName, void *(*testImpl)(void *)) {
         }
     }
 
-    printf("\t[\033[0;32mPASS\033[0;0m]\n");
+    printf("%s:\t\t[\033[0;32mPASS\033[0;0m]\n", testName);
     return 0;
 }
 
@@ -95,7 +109,6 @@ int main(int argc, char *argv[]) {
      * The main testing loop. Runs a bunch of unit tests and asserts that
      * they all pass.
      */
-    printf("\t[\033[0;32mPASS\033[0;0m]\n");
     int retVal = assertPass("circularTest", circularTest);
 
 

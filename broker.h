@@ -16,7 +16,7 @@ void sendWakeup(int _destNodeIdx);
 void sendShutdown(int _destNodeIdx);
 void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen);   // blocking recv
 
-
+void setWorkerDone(int myNodeIdx);
 
 
 // checks if any of the workers have messages to send;

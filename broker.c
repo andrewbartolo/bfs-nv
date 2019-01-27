@@ -19,6 +19,13 @@ typedef enum msgType {
 
 
 /*
+ * So that the broker loop can terminate when all workers are done.
+ * Static declaration ensures this starts out initialized to false.
+ */
+static bool workerDone[N_WORKERS];
+
+
+/*
  * These represent the registers exported by the master FPGA.
  * TODO make sure these are set and read atomically!!
  */
@@ -96,12 +103,28 @@ void recv(int myNodeIdx, char *workerBuffer, int *_bufferLen) {
 }
 
 
+void setWorkerDone(int myNodeIdx) {
+    workerDone[myNodeIdx] = true;
+}
+
+
+/*
+ * This function is internal to the broker module. It allows the broker
+ * to shut down when all workers are finished with it. This is useful, e.g.,
+ * when completing individual unit tests.
+ */
+bool anyWorkerNeedsMe() {
+    for (int i = 0; i < N_WORKERS; ++i) {
+        if (!workerDone[i]) return true;
+    }
+    return false;
+}
 
 
 void broker_loop() {
     printf("Beginning broker loop\n");
 
-    while (true) {
+    while (anyWorkerNeedsMe()) {
         // Walk the RTS bitvector, seeing if anyone wants to send
         // TODO replace with e.g. hardware interrupts instead of polling
         for (int senderNodeIdx = 0; senderNodeIdx < N_WORKERS; ++senderNodeIdx) {
